@@ -19,19 +19,109 @@ namespace UnityEngine.AI
         {
             map = new Dictionary<Sprite, Mesh>();
         }
+        
+        private Mesh CreateMeshFromPolygon(List<Vector3> polygon)
+        {
+            var center = findCenter (polygon);
+            polygon.Add (center);
+     
+            var tris = new List<int>();
+
+            var vertices = polygon.ToArray();
+
+            for (int j = vertices.Length - 3; j >= 0; j--)
+            {
+                tris.Add (j);
+
+                if (j - 2 >= 0)
+                {
+                    tris.Add (j - 2);
+                }
+                else
+                {
+                    var diff = j - 2;
+                    tris.Add (vertices.Length - 2 + diff);
+                }
+                
+                if (j % 2 == 0)
+                {
+                    tris.Add (vertices.Length - 2);
+                }
+                else
+                {
+                    tris.Add (vertices.Length - 1);
+                }
+            }
+
+            for (int j = vertices.Length-3; j >= 2; j--)
+            {
+                if (j % 2 == 1)
+                {
+                    tris.Add (j);
+                    tris.Add (j - 1);
+                    tris.Add (j - 2);
+                } else
+                {
+                    tris.Add (j);
+                    tris.Add (j - 2);
+                    tris.Add (j - 1);
+                }
+            }
+               
+            var triangles = tris.ToArray();
+     
+            Mesh mesh = new Mesh();
+            mesh.vertices = vertices;
+            mesh.triangles = triangles;
+            mesh.RecalculateBounds();
+            mesh.RecalculateNormals();
+
+            return mesh;
+        }
+        
+        Vector3 findCenter(List<Vector3> verts)
+        {
+            var center = Vector3.zero;
+
+            for (int i = 0; i < verts.Count; i+= 2) {
+                center += verts [i];
+            }
+            return center / (verts.Count / 2);
+        }
 
         public Mesh GetMesh(Sprite sprite)
         {
             Mesh mesh;
+
             if (map.ContainsKey(sprite))
             {
                 mesh = map[sprite];
             }
             else
             {
-                mesh = new Mesh();
-                NavMeshBuilder2d.sprite2mesh(sprite, mesh);
-                map.Add(sprite, mesh);
+                if (sprite.GetPhysicsShapeCount() > 0)
+                {
+                    List<Vector2> shape = new List<Vector2>();
+                    sprite.GetPhysicsShape(0, shape);
+                    mesh = new Mesh();
+                
+                    var vertices = new List<Vector3>();
+
+                    foreach (var point in shape)
+                    {
+                        vertices.Add(new Vector3(point.x, point.y, 0.0f));
+                    }
+
+                    mesh = CreateMeshFromPolygon(vertices);
+
+                    map.Add(sprite, mesh);
+                }
+                else
+                {
+                    mesh = new Mesh();
+                    NavMeshBuilder2d.sprite2mesh(sprite, mesh);
+                    map.Add(sprite, mesh);
+                }
             }
             return mesh;
         }
