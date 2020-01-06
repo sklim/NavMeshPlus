@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine.Tilemaps;
 
 namespace UnityEngine.AI
@@ -89,7 +90,7 @@ namespace UnityEngine.AI
             return center / (verts.Count / 2);
         }
 
-        public Mesh GetMesh(Sprite sprite)
+        public Mesh GetMesh(Sprite sprite, Transform transform)
         {
             Mesh mesh;
 
@@ -99,21 +100,24 @@ namespace UnityEngine.AI
             }
             else
             {
-                if (sprite.GetPhysicsShapeCount() > 0)
+                var shapeCount = sprite.GetPhysicsShapeCount();
+                if (shapeCount > 0)
                 {
-                    List<Vector2> shape = new List<Vector2>();
-                    sprite.GetPhysicsShape(0, shape);
                     mesh = new Mesh();
-                
-                    var vertices = new List<Vector3>();
-
-                    foreach (var point in shape)
+                    var combine = new CombineInstance[shapeCount];
+                    
+                    for (var i = 0; i < shapeCount; i++)
                     {
-                        vertices.Add(new Vector3(point.x, point.y, 0.0f));
+                        var shape = new List<Vector2>();
+                        sprite.GetPhysicsShape(i, shape);
+                
+                        var vertices = shape.Select(point => new Vector3(point.x, point.y, 0.0f)).ToList();
+
+                        combine[i].mesh = CreateMeshFromPolygon(vertices);
+                        combine[i].transform = transform.localToWorldMatrix;
                     }
 
-                    mesh = CreateMeshFromPolygon(vertices);
-
+                    mesh.CombineMeshes(combine);
                     map.Add(sprite, mesh);
                 }
                 else
@@ -188,7 +192,7 @@ namespace UnityEngine.AI
             src.area = area;
 
             Mesh mesh;
-            mesh = builder.GetMesh(sprite.sprite);
+            mesh = builder.GetMesh(sprite.sprite, sprite.transform);
             if (mesh == null)
             {
                 Debug.Log($"{sprite.name} mesh is null");
@@ -234,7 +238,7 @@ namespace UnityEngine.AI
 
                     if (!builder.overrideByGrid && tilemap.GetColliderType(vec3int) == Tile.ColliderType.Sprite)
                     {
-                        mesh = builder.GetMesh(tilemap.GetSprite(vec3int));
+                        mesh = builder.GetMesh(tilemap.GetSprite(vec3int), tilemap.transform);
                         src.transform = Matrix4x4.Translate(Vector3.Scale(tilemap.GetCellCenterWorld(vec3int),builder.overrideVector)) * tilemap.GetTransformMatrix(vec3int);
                         src.sourceObject = mesh;
                         sources.Add(src);
