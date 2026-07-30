@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.IO;
-using UnityEditor.Experimental.SceneManagement;
 using UnityEditor.SceneManagement;
 using UnityEngine.AI;
 using UnityEngine;
+using UnityEditor;
 
-namespace UnityEditor.AI
+namespace NavMeshPlus.Components.Editors
 {
     public class NavMeshAssetManager : ScriptableSingleton<NavMeshAssetManager>
     {
@@ -41,11 +41,20 @@ namespace UnityEditor.AI
             {
                 var prefabStage = PrefabStageUtility.GetPrefabStage(surface.gameObject);
                 var isPartOfPrefab = prefabStage != null && prefabStage.IsPartOfPrefabContents(surface.gameObject);
-                if (isPartOfPrefab && !string.IsNullOrEmpty(prefabStage.prefabAssetPath))
+
+                if (isPartOfPrefab)
                 {
-                    var prefabDirectoryName = Path.GetDirectoryName(prefabStage.prefabAssetPath);
-                    if (!string.IsNullOrEmpty(prefabDirectoryName))
-                        targetPath = prefabDirectoryName;
+#if UNITY_2020_1_OR_NEWER
+                    var assetPath = prefabStage.assetPath;
+#else
+                    var assetPath = prefabStage.prefabAssetPath;
+#endif
+                    if (!string.IsNullOrEmpty(assetPath))
+                    {
+                        var prefabDirectoryName = Path.GetDirectoryName(assetPath);
+                        if (!string.IsNullOrEmpty(prefabDirectoryName))
+                            targetPath = prefabDirectoryName;
+                    }
                 }
             }
             if (!Directory.Exists(targetPath))

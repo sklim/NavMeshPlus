@@ -1,24 +1,43 @@
+using UnityEditor;
+using UnityEditor.AI;
 using UnityEngine;
 using UnityEngine.AI;
 
-namespace UnityEditor.AI
+namespace NavMeshPlus.Components.Editors
 {
     public static class NavMeshComponentsGUIUtility
     {
-        public static void AreaPopup(string labelName, SerializedProperty areaProperty)
+        static string[] GetAreaNames()
+        {
+#if UNITY_6000_0_OR_NEWER
+            return NavMesh.GetAreaNames();
+#else
+            return GameObjectUtility.GetNavMeshAreaNames();
+#endif
+        }
+
+        static int GetAreaFromName(string areaName)
+        {
+#if UNITY_6000_0_OR_NEWER
+            return NavMesh.GetAreaFromName(areaName);
+#else
+            return GameObjectUtility.GetNavMeshAreaFromName(areaName);
+#endif
+        }
+
+        public static void AreaPopup(Rect rect, string labelName, SerializedProperty areaProperty)
         {
             var areaIndex = -1;
-            var areaNames = GameObjectUtility.GetNavMeshAreaNames();
+            var areaNames = GetAreaNames();
             for (var i = 0; i < areaNames.Length; i++)
             {
-                var areaValue = GameObjectUtility.GetNavMeshAreaFromName(areaNames[i]);
+                var areaValue = GetAreaFromName(areaNames[i]);
                 if (areaValue == areaProperty.intValue)
                     areaIndex = i;
             }
             ArrayUtility.Add(ref areaNames, "");
             ArrayUtility.Add(ref areaNames, "Open Area Settings...");
 
-            var rect = EditorGUILayout.GetControlRect(true, EditorGUIUtility.singleLineHeight);
             EditorGUI.BeginProperty(rect, GUIContent.none, areaProperty);
 
             EditorGUI.BeginChangeCheck();
@@ -27,7 +46,7 @@ namespace UnityEditor.AI
             if (EditorGUI.EndChangeCheck())
             {
                 if (areaIndex >= 0 && areaIndex < areaNames.Length - 2)
-                    areaProperty.intValue = GameObjectUtility.GetNavMeshAreaFromName(areaNames[areaIndex]);
+                    areaProperty.intValue = GetAreaFromName(areaNames[areaIndex]);
                 else if (areaIndex == areaNames.Length - 1)
                     NavMeshEditorHelpers.OpenAreaSettings();
             }
@@ -35,7 +54,20 @@ namespace UnityEditor.AI
             EditorGUI.EndProperty();
         }
 
-        public static void AgentTypePopup(string labelName, SerializedProperty agentTypeID)
+        public static bool IsAgentSelectionValid(SerializedProperty agentTypeID)
+        {
+            var count = NavMesh.GetSettingsCount();
+            for (var i = 0; i < count; i++)
+            {
+                var id = NavMesh.GetSettingsByIndex(i).agentTypeID;
+                var name = NavMesh.GetSettingsNameFromID(id);
+                if (id == agentTypeID.intValue)
+                    return true;
+            }
+            return false;
+        }
+
+        public static void AgentTypePopup(Rect rect, string labelName, SerializedProperty agentTypeID)
         {
             var index = -1;
             var count = NavMesh.GetSettingsCount();
@@ -54,10 +86,14 @@ namespace UnityEditor.AI
             bool validAgentType = index != -1;
             if (!validAgentType)
             {
-                EditorGUILayout.HelpBox("Agent Type invalid.", MessageType.Warning);
+                Rect warningRect = rect;
+                warningRect.height *= .5f;
+                warningRect.y += warningRect.height;
+                EditorGUI.HelpBox(warningRect, "Agent Type invalid.", MessageType.Warning);
+
+                rect.height *= .5f;
             }
 
-            var rect = EditorGUILayout.GetControlRect(true, EditorGUIUtility.singleLineHeight);
             EditorGUI.BeginProperty(rect, GUIContent.none, agentTypeID);
 
             EditorGUI.BeginChangeCheck();

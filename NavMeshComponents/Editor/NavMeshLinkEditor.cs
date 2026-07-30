@@ -1,7 +1,7 @@
+using UnityEditor;
 using UnityEngine;
-using UnityEngine.AI;
 
-namespace UnityEditor.AI
+namespace NavMeshPlus.Components.Editors
 {
     [CanEditMultipleObjects]
     [CustomEditor(typeof(NavMeshLink))]
@@ -22,6 +22,15 @@ namespace UnityEditor.AI
         static Color s_HandleColor = new Color(255f, 167f, 39f, 210f) / 255;
         static Color s_HandleColorDisabled = new Color(255f * 0.75f, 167f * 0.75f, 39f * 0.75f, 100f) / 255;
 
+        static int GetObjectId(Object obj)
+        {
+#if UNITY_6000_0_OR_NEWER
+            return obj.GetEntityId().GetHashCode();
+#else
+            return obj.GetInstanceID();
+#endif
+        }
+
         void OnEnable()
         {
             m_AgentTypeID = serializedObject.FindProperty("m_AgentTypeID");
@@ -36,13 +45,10 @@ namespace UnityEditor.AI
             s_SelectedID = 0;
             s_SelectedPoint = -1;
 
-            NavMeshVisualizationSettings.showNavigation++;
+
         }
 
-        void OnDisable()
-        {
-            NavMeshVisualizationSettings.showNavigation--;
-        }
+
 
         static Matrix4x4 UnscaledLocalToWorldMatrix(Transform t)
         {
@@ -75,7 +81,7 @@ namespace UnityEditor.AI
         {
             serializedObject.Update();
 
-            NavMeshComponentsGUIUtility.AgentTypePopup("Agent Type", m_AgentTypeID);
+            EditorGUILayout.PropertyField(m_AgentTypeID);
             EditorGUILayout.Space();
 
             EditorGUILayout.PropertyField(m_StartPoint);
@@ -110,8 +116,7 @@ namespace UnityEditor.AI
             EditorGUILayout.PropertyField(m_CostModifier);
             EditorGUILayout.PropertyField(m_AutoUpdatePosition);
             EditorGUILayout.PropertyField(m_Bidirectional);
-
-            NavMeshComponentsGUIUtility.AreaPopup("Area Type", m_Area);
+            EditorGUILayout.PropertyField(m_Area);
 
             serializedObject.ApplyModifiedProperties();
 
@@ -135,10 +140,12 @@ namespace UnityEditor.AI
             Gizmos.DrawLine(navLink.startPoint + right * rad, navLink.endPoint + right * rad);
         }
 
-        [DrawGizmo(GizmoType.Selected | GizmoType.Active | GizmoType.Pickable)]
+
+        [DrawGizmo(GizmoType.InSelectionHierarchy | GizmoType.Active | GizmoType.Pickable)]
+
         static void RenderBoxGizmo(NavMeshLink navLink, GizmoType gizmoType)
         {
-            if (!EditorApplication.isPlaying)
+            if (!EditorApplication.isPlaying && navLink.isActiveAndEnabled)
                 navLink.UpdateLink();
 
             var color = s_HandleColor;
@@ -162,7 +169,9 @@ namespace UnityEditor.AI
         [DrawGizmo(GizmoType.NotInSelectionHierarchy | GizmoType.Pickable)]
         static void RenderBoxGizmoNotSelected(NavMeshLink navLink, GizmoType gizmoType)
         {
-            if (NavMeshVisualizationSettings.showNavigation > 0)
+            if (!EditorApplication.isPlaying && navLink.isActiveAndEnabled)
+                navLink.UpdateLink();
+
             {
                 var color = s_HandleColor;
                 if (!navLink.enabled)
@@ -206,7 +215,7 @@ namespace UnityEditor.AI
 
             Vector3 pos;
 
-            if (navLink.GetInstanceID() == s_SelectedID && s_SelectedPoint == 0)
+            if (GetObjectId(navLink) == s_SelectedID && s_SelectedPoint == 0)
             {
                 EditorGUI.BeginChangeCheck();
                 Handles.CubeHandleCap(0, startPt, zup, 0.1f * startSize, Event.current.type);
@@ -222,11 +231,11 @@ namespace UnityEditor.AI
                 if (Handles.Button(startPt, zup, 0.1f * startSize, 0.1f * startSize, Handles.CubeHandleCap))
                 {
                     s_SelectedPoint = 0;
-                    s_SelectedID = navLink.GetInstanceID();
+                    s_SelectedID = GetObjectId(navLink);
                 }
             }
 
-            if (navLink.GetInstanceID() == s_SelectedID && s_SelectedPoint == 1)
+            if (GetObjectId(navLink) == s_SelectedID && s_SelectedPoint == 1)
             {
                 EditorGUI.BeginChangeCheck();
                 Handles.CubeHandleCap(0, endPt, zup, 0.1f * startSize, Event.current.type);
@@ -242,7 +251,7 @@ namespace UnityEditor.AI
                 if (Handles.Button(endPt, zup, 0.1f * endSize, 0.1f * endSize, Handles.CubeHandleCap))
                 {
                     s_SelectedPoint = 1;
-                    s_SelectedID = navLink.GetInstanceID();
+                    s_SelectedID = GetObjectId(navLink);
                 }
             }
 
@@ -265,8 +274,8 @@ namespace UnityEditor.AI
             Handles.color = oldColor;
         }
 
-        [MenuItem("GameObject/AI/NavMesh Link", false, 2002)]
-        static public void CreateNavMeshLink(MenuCommand menuCommand)
+        [MenuItem("GameObject/Navigation/NavMesh Link", false, 2002)]
+        public static void CreateNavMeshLink(MenuCommand menuCommand)
         {
             var parent = menuCommand.context as GameObject;
             GameObject go = NavMeshComponentsGUIUtility.CreateAndSelectGameObject("NavMesh Link", parent);
